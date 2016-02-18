@@ -13,7 +13,7 @@ var search = amazonSearch.create({
 // Searching for "cuia" sorted by "review-rank"
 search('cuia', 'review-rank', function (result) {
     try {
-    	fs.write('results.json', JSON.stringify(result,null,2), 'w');
+    	fs.write('results.json', JSON.stringify(result), 'w');
     } catch(e) {
         console.log(e);
     }
