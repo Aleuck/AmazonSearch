@@ -3,20 +3,6 @@
 Author: Alexandre Leuck
 
 -------------------------------------------------
- Usage example:
--------------------------------------------------
-
-var amazonSearch = require('./amazonsearch');
-var search = amazonSearch.create({
-    base_uri: 'http://www.amazon.de',
-    save_html: true
-});
-
-search("digitalkamera+slr", "review-rank", function (result) {
-    console.dir(result);
-});
-
--------------------------------------------------
 Valid sort options:
 -------------------------------------------------
 
@@ -76,7 +62,7 @@ var resultsDataCrawler = function (settings) {
             r.html = rElement.outerHTML;
         }
         var possiblePriceEl = rElement.getElementsByClassName('s-price');
-        if (possibleRatingEls.length > 0) {
+        if (possiblePriceEl.length > 0) {
             r.price = possiblePriceEl[0].textContent;
         }
         // TODO: gather more data
@@ -114,14 +100,14 @@ exports.create = function (customSettings) {
         searchPage.viewportSize = settings.window_size;
 
         // for debugging
-        searchPage.onConsoleMessage = function (msg) {
-            console.log("--> Page says: " + msg);
-        };
-        searchPage.onLoadFinished = function () {
-            console.log("-- finished loading --");
-        };
+        // searchPage.onConsoleMessage = function (msg) {
+        //     console.log("--> Page says: " + msg);
+        // };
+        // searchPage.onLoadFinished = function () {
+        //     console.log("-- finished loading --");
+        // };
 
-        console.log("oppening: ", uri);
+        //console.log("oppening: ", uri);
 
         searchPage.open(uri, function (status) {
             var pageCount, currentPage, openCurrentPage, productsFetcher;
@@ -154,7 +140,7 @@ exports.create = function (customSettings) {
                 }
                 // add page to the results
                 result.pages.push(page);
-
+                console.log(currentPage + '/' + pageCount);
                 // move to next page, if needed
                 if (currentPage < pageCount) {
                     currentPage += 1;
@@ -165,7 +151,7 @@ exports.create = function (customSettings) {
                     }
                 }
             };
-            console.log("interval:", settings.request_interval);
+            // console.log("interval:", settings.request_interval);
             setTimeout(openCurrentPage, settings.request_interval);
         });
     };
