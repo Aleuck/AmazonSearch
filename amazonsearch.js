@@ -46,13 +46,18 @@ var resultsDataCrawler = function (settings) {
     var results = [];
     Array.prototype.forEach.call(resultsDOM, function (rElement) {
         var r = {};
+        var h2;
         // result description
-        r.name = rElement.getElementsByTagName("h2")[0].textContent;
-        r.url = rElement.getElementsByTagName("a")[0].href;
+        h2 = rElement.getElementsByTagName("h2")[0];
+        if (!h2) {
+            return; // skip, empty cell
+        }
+        r.name = h2.textContent;
+        r.uri = rElement.getElementsByTagName("a")[0].href;
         // find result rating and if it is Prime or not.
         var possibleRatingEls = rElement.getElementsByClassName("a-icon-alt");
         if (possibleRatingEls.length > 0) {
-            r.rating = parseInt(possibleRatingEls[possibleRatingEls.length - 1].textContent.split(' ')[0], 10);
+            r.rating = parseFloat(possibleRatingEls[possibleRatingEls.length - 1].textContent.split(' ')[0].replace(',','.'), 10) || 0;
             r.prime = possibleRatingEls[0].textContent.split(' ')[0] === 'Prime';
         } else {
             r.rating = 0;
@@ -61,9 +66,10 @@ var resultsDataCrawler = function (settings) {
         if (settings.save_html) {
             r.html = rElement.outerHTML;
         }
-        var possiblePriceEl = rElement.getElementsByClassName('s-price');
+        var possiblePriceEl = rElement.getElementsByClassName('a-color-price');
         if (possiblePriceEl.length > 0) {
-            r.price = possiblePriceEl[0].textContent;
+            r.price = parseFloat(possiblePriceEl[0].textContent.replace(/[a-zA-Z\ \t\n\r$€]/g, '').replace(',','.'),10) || null;
+            console.log(r.price);
         }
         // TODO: gather more data
         results.push(r);
@@ -85,7 +91,8 @@ exports.create = function (customSettings) {
     }
     // amazon does not allow sort options if we identify ourselves as "phantomjs"
     var search = function (keywords, sort, callback) {
-        var uri = settings.base_uri + 's/?keywords=' + keywords + '&sort=' + sort;
+        keywords = keywords.split(/[\ \t\n\r]+/).map(encodeURIComponent).join('+');
+        var uri = settings.base_uri + 's/ref=nb_sb_noss_2?keywords=' + keywords + '&sort=' + sort;
         var webpage = require('webpage');
         var searchPage = webpage.create();
         var result = {
@@ -100,9 +107,9 @@ exports.create = function (customSettings) {
         searchPage.viewportSize = settings.window_size;
 
         // for debugging
-        // searchPage.onConsoleMessage = function (msg) {
-        //     console.log("--> Page says: " + msg);
-        // };
+        searchPage.onConsoleMessage = function (msg) {
+            console.log("--> Page says: " + msg);
+        };
         // searchPage.onLoadFinished = function () {
         //     console.log("-- finished loading --");
         // };
@@ -114,6 +121,7 @@ exports.create = function (customSettings) {
             if (status !== 'success') {
                 throw new Error("Page couldn't be opened.");
             }
+            result.date = new Date();
             // lets find out how many pages of results we got
             pageCount = searchPage.evaluate(pageCountCrawler, settings);
             currentPage = 1;
@@ -128,6 +136,7 @@ exports.create = function (customSettings) {
 
                 // gather data of each result in this page
                 var page = {};
+                page.date = new Date();
                 page.number = currentPage;
                 page.uri = uri + '&page=' + currentPage;
                 // get data from the results in this page
@@ -140,7 +149,7 @@ exports.create = function (customSettings) {
                 }
                 // add page to the results
                 result.pages.push(page);
-                console.log(currentPage + '/' + pageCount);
+                console.log('Pages read: ' + currentPage + '/' + pageCount);
                 // move to next page, if needed
                 if (currentPage < pageCount) {
                     currentPage += 1;
@@ -151,7 +160,7 @@ exports.create = function (customSettings) {
                     }
                 }
             };
-            // console.log("interval:", settings.request_interval);
+            console.log('Pages read: 0/' + pageCount);
             setTimeout(openCurrentPage, settings.request_interval);
         });
     };
