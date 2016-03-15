@@ -1,0 +1,32 @@
+{
+  "name": "amazon-search",
+  "version": "1.0.0",
+  "description": "Automatically fetch result data from amazon queries using nodejs and phantomjs",
+  "main": "amazon.js",
+  "dependencies": {
+    "mongodb": "^2.1.7",
+    "phantom": "^2.0.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "amazon.js Coffee machine"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aleuck/AmazonSearch.git"
+  },
+  "keywords": [
+    "amazon",
+    "search",
+    "phantom",
+    "phantomjs",
+    "node",
+    "nodejs"
+  ],
+  "author": "Alexandre Leuck",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Aleuck/AmazonSearch/issues"
+  },
+  "homepage": "https://github.com/Aleuck/AmazonSearch#readme"
+}
