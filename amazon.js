@@ -8,7 +8,7 @@ process.on('unhandledRejection', (reason, p) => {
     // application specific logging, throwing an error, or other logic here
 });
 var child_process = require('child_process')
-var amazonSearch = require('./new');
+var amazonSearch = require('./amazonsearch');
 var MongoClient = require('mongodb').MongoClient;
 var assert = require('assert');
 var fs = require('fs');
@@ -39,7 +39,6 @@ search(keywords, 'review-rank', (result) => {
         console.log('file saved.');
         child_process.execSync(`pdfunite page_* ${outputName}.pdf`);
         child_process.execSync('rm page_*');
-        process.exit();
     });
     var url = 'mongodb://localhost:27017/amazonSearch';
     MongoClient.connect(url, function(err, db) {
@@ -48,6 +47,7 @@ search(keywords, 'review-rank', (result) => {
         var collection = db.collection(result.keywords);
         collection.insert(result, function (err, result) {
             assert.equal(null, err);
+            process.exit();
         });
     });
 });
