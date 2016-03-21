@@ -4,7 +4,7 @@ var phantom = require('phantom');
 
 var defaultSettings = {
     base_uri: "http://www.amazon.com/",
-    request_interval: 500,
+    request_interval: 1800,
     save_html: false,
     save_screenshots: false,
     window_size: {
@@ -145,26 +145,33 @@ exports.create = function (customSettings) {
                             throw new Error("Page couldn't be opened.");
                         }
                         page.evaluate(pageCountCrawler, settings).then(function (pageCount) {
-                            var currentPage, openCurrentPage, resultsFetcher;
+                            var currentPage, openCurrentPage, retryCurrentPage, resultsFetcher, num_fails = 0;
                             currentPage = 1;
                             console.log(pageCount + ' pages.');
                             result.date = new Date();
                             openCurrentPage = function () {
-                                page.open(uri + '&page=' + currentPage).then(resultsFetcher);
+                                page.open(uri + '&page=' + currentPage).then(resultsFetcher, retryCurrentPage);
                             };
+                            retryCurrentPage = function () {
+                                var page_uri = uri + '&page=' + currentPage,
+                                    wait_time;
+                                num_fails += 1;
+                                wait_time = settings.request_interval + (num_fails * 500);
+                                console.log(`failed to load page ${currentPage} (${page_uri})`);
+                                console.log(`retrying in ${(wait_time/1000).toFixed(1)} seconds...`);
+                                setTimeout(openCurrentPage, wait_time);
+                            }
                             resultsFetcher = function (status) {
                                 if (status !== 'success') {
-                                    throw new Error("Page couldn't be opened.");
+                                    console.log(status);
+                                    retryCurrentPage();
+                                    return;
                                 }
+                                num_fails = 0;
                                 // take a screenshotresults
                                 // NOT YET
                                 var p = {};
-                                result.pages.push(p);
-                                p.date = new Date();
-                                p.number = currentPage;
-                                p.uri = uri + '&page=' + currentPage;
-                                console.log('reading page...');
-                                page.evaluate(resultsDataCrawler, settings).then(function (p_data) {
+                                var storeResults = function (p_data) {
                                     p.results = p_data.results;
                                     p.html = p_data.html;
                                     result.results = result.results.concat(p_data.results);
@@ -176,10 +183,17 @@ exports.create = function (customSettings) {
                                     } else {
                                         if (settings.detailed) {
                                             // detailed
-                                            var currentResult, openCurrentResult, detailsFetcher;
+                                            var currentResult, openCurrentResult, retryCurrentResult, detailsFetcher, num_fails = 0;
                                             currentResult = 0;
                                             openCurrentResult = function () {
                                                 page.open(result.results[currentResult].uri).then(detailsFetcher);
+                                            };
+                                            retryCurrentResult = function () {
+                                                num_fails += 1;
+                                                var wait_time = settings.request_interval + (num_fails * 500);
+                                                console.log(`failed to load page of result #${currentResult+1} (${result.results[currentResult].uri})`);
+                                                console.log(`retrying in ${(wait_time/1000).toFixed(1)} seconds...`);
+                                                setTimeout(openCurrentResult, wait_time);
                                             };
                                             detailsFetcher = function (status) {
                                                 console.log('ResultDetail: ' + (currentResult + 1) + '/' + result.results.length);
@@ -211,7 +225,13 @@ exports.create = function (customSettings) {
                                             //ph.exit();
                                         }
                                     } // else
-                                }); // Promise
+                                }
+                                result.pages.push(p);
+                                p.date = new Date();
+                                p.number = currentPage;
+                                p.uri = uri + '&page=' + currentPage;
+                                console.log('reading page...');
+                                page.evaluate(resultsDataCrawler, settings).then(storeResults); // Promise
                             }; // resultsFetcher
                             setTimeout(openCurrentPage, settings.request_interval);
                         });

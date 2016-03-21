@@ -16,7 +16,7 @@ var fs = require('fs');
 var search = amazonSearch.create({
     base_uri: 'http://www.amazon.de/',
     save_html: true,
-    request_interval: 2000,
+    request_interval: 1000,
     detailed: true
 });
 
