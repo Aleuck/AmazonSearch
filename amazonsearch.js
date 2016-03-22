@@ -184,6 +184,7 @@ exports.create = function (customSettings) {
                             querySummary.qid = qid;
                             uri = uri + '&qid=' + qid;
                             querySummary.uri = uri;
+                            querySummary.date = result.date;
                             openCurrentPage = function () {
                                 page.open(uri + '&page=' + currentPage).then(resultsFetcher, retryCurrentPage);
                             };
@@ -239,6 +240,7 @@ exports.create = function (customSettings) {
                                                     Object.keys(details).forEach(function (key) {
                                                         result.results[currentResult][key] = details[key];
                                                     });
+                                                    result.results[currentResult].querySummary =  querySummary
                                                     currentResult += 1;
                                                     if (currentResult < result.results.length) {
                                                         page.stop();
