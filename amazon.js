@@ -1,13 +1,13 @@
 "use strict";
 process.on('uncaughtException', (err) => {
-  console.log(`Caught exception: ${err}`);
+    console.log(`Caught exception: ${err}`);
 });
 
 process.on('unhandledRejection', (reason, p) => {
     console.log("Unhandled Rejection at: Promise ", p, " reason: ", reason);
     // application specific logging, throwing an error, or other logic here
 });
-var child_process = require('child_process')
+var child_process = require('child_process');
 var amazonSearch = require('./amazonsearch');
 var MongoClient = require('mongodb').MongoClient;
 var assert = require('assert');
@@ -16,13 +16,13 @@ var fs = require('fs');
 var search = amazonSearch.create({
     base_uri: 'http://www.amazon.de/',
     save_html: true,
-    request_interval: 1000,
+    request_interval: 1300,
     detailed: true
 });
 
 
 if (process.argv.length === 2) {
-	console.log("please specify the search string");
+    console.log("please specify the search string");
 }
 var keywords = process.argv.slice(2).join(' ');
 //  handy+h%C3%BClle
@@ -42,12 +42,22 @@ search(keywords, 'review-rank', (result) => {
     });
     var url = 'mongodb://localhost:27017/amazonSearch';
     MongoClient.connect(url, function(err, db) {
+        var inserts = 0;
         assert.equal(null, err);
         console.log('connected to mongodb');
         var collection = db.collection(result.keywords);
-        collection.insert(result, function (err, result) {
-            assert.equal(null, err);
-            process.exit();
+        result.results.forEach(function (r) {
+            collection.insert(r, function (err, res) {
+                assert.equal(null, err);
+                inserts += 1;
+                if (inserts === result.results.length) {
+                    process.exit();
+                }
+            });
         });
+        //collection.insert(result, function (err, result) {
+        //    assert.equal(null, err);
+        //    process.exit();
+        //});
     });
 });

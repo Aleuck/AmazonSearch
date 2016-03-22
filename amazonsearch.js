@@ -16,13 +16,16 @@ var defaultSettings = {
 };
 
 // function to crawl the number of result pages from document
-var pageCountCrawler = function () {
+var queryDataCrawler = function () {
+    var data = {};
     // the previous sibling of the "next page" button contains the last page number
     var next = document.getElementsByClassName("pagnRA")[0];
     if (!next) {
         return 1;
     }
-    return parseInt(next.previousElementSibling.textContent, 10);
+    data.pageCount = parseInt(next.previousElementSibling.textContent, 10);
+    data.qid = document.getElementsByName('qid')[0].value;
+    return data;
 };
 // function to crawl results' basic dadetailedta from search results page
 var resultsDataCrawler = function (settings) {
@@ -33,11 +36,16 @@ var resultsDataCrawler = function (settings) {
     };
     Array.prototype.forEach.call(resultsDOM, function (rElement) {
         var r = {};
-        var h2;
+        var h2, img;
         // result description
         h2 = rElement.getElementsByTagName("h2")[0];
         if (!h2) {
             return; // skip, empty cell
+        }
+        img = rElement.getElementsByClassName("s-access-image");
+        if (img.length == 0) {
+                console.log("'" + h2.textContent + "' has no img, skipping");
+                return;
         }
         r.name = h2.textContent;
         r.uri = rElement.getElementsByTagName("a")[0].href;
@@ -63,8 +71,8 @@ var resultsDataCrawler = function (settings) {
 };
 var resultsDetailedDataCrawler = function (settings) {
     var details = {
-        numReviews: 0,
-        numAnswers: 0
+        numReviews: undefined,
+        numAnswers: undefined
     };
     var detailsEl = document.getElementById('prodDetails');
     var numReviewsEl = document.getElementById('acrCustomerReviewText');
@@ -81,11 +89,11 @@ var resultsDetailedDataCrawler = function (settings) {
     }
     if (histogramEl) {
         var ratingRows = histogramEl.getElementsByTagName('tr');
-        details.numRatings5 = parseInt(ratingRows[0].lastElementChild.textContent.trim(), 10);
-        details.numRatings4 = parseInt(ratingRows[1].lastElementChild.textContent.trim(), 10);
-        details.numRatings3 = parseInt(ratingRows[2].lastElementChild.textContent.trim(), 10);
-        details.numRatings2 = parseInt(ratingRows[3].lastElementChild.textContent.trim(), 10);
-        details.numRatings1 = parseInt(ratingRows[4].lastElementChild.textContent.trim(), 10);
+        details.numRatings5 = parseInt(ratingRows[0].lastElementChild.textContent.trim(), 10) || 0;
+        details.numRatings4 = parseInt(ratingRows[1].lastElementChild.textContent.trim(), 10) || 0;
+        details.numRatings3 = parseInt(ratingRows[2].lastElementChild.textContent.trim(), 10) || 0;
+        details.numRatings2 = parseInt(ratingRows[3].lastElementChild.textContent.trim(), 10) || 0;
+        details.numRatings1 = parseInt(ratingRows[4].lastElementChild.textContent.trim(), 10) || 0;
     }
     if (detailsEl) {
         var tdEls, k, v;
@@ -100,8 +108,19 @@ var resultsDetailedDataCrawler = function (settings) {
         }).map(function (e) {
             return e.textContent.trim();
         });
-        details.ASIN = v[k.indexOf('ASIN')];
-        details.dateFirstAvailable = v[k.indexOf('Date First Available')];
+        k.forEach(function (key, index) {
+            details[key] = v[index];
+        });
+    }
+    detailsEl = document.getElementById('detail_bullets_id');
+    if (detailsEl) {
+        Array.prototype.forEach.call(detailsEl.getElementsByTagName("li"), function (el) {
+            var trim = function (str) {
+                return str.trim();
+            };
+            var prop = el.textContent.split(":").map(trim);
+            details[prop[0]] = prop[1];
+        });
     }
     return details;
 };
@@ -131,6 +150,12 @@ exports.create = function (customSettings) {
             results: [],
             settings: Object.create(settings)
         };
+        var querySummary = {
+            keywords: keywords,
+            sort: sort,
+            uri: uri,
+            qid: null
+        };
         phantom.create().then(function (ph) {
             ph.createPage().then(function (page) {
                 var userAgentPromise = page.setting('userAgent', settings.user_agent);
@@ -144,11 +169,21 @@ exports.create = function (customSettings) {
                             //reject(new Error("Page couldn't be opened."));
                             throw new Error("Page couldn't be opened.");
                         }
-                        page.evaluate(pageCountCrawler, settings).then(function (pageCount) {
-                            var currentPage, openCurrentPage, retryCurrentPage, resultsFetcher, num_fails = 0;
+                        page.evaluate(queryDataCrawler, settings).then(function (queryData) {
+                            var currentPage = 1,
+                                openCurrentPage,
+                                retryCurrentPage,
+                                resultsFetcher,
+                                num_fails = 0,
+                                pageCount = queryData.pageCount,
+                                qid = queryData.qid;
                             currentPage = 1;
                             console.log(pageCount + ' pages.');
                             result.date = new Date();
+                            result.qid = qid;
+                            querySummary.qid = qid;
+                            uri = uri + '&qid=' + qid;
+                            querySummary.uri = uri;
                             openCurrentPage = function () {
                                 page.open(uri + '&page=' + currentPage).then(resultsFetcher, retryCurrentPage);
                             };
@@ -163,7 +198,6 @@ exports.create = function (customSettings) {
                             }
                             resultsFetcher = function (status) {
                                 if (status !== 'success') {
-                                    console.log(status);
                                     retryCurrentPage();
                                     return;
                                 }
@@ -186,7 +220,7 @@ exports.create = function (customSettings) {
                                             var currentResult, openCurrentResult, retryCurrentResult, detailsFetcher, num_fails = 0;
                                             currentResult = 0;
                                             openCurrentResult = function () {
-                                                page.open(result.results[currentResult].uri).then(detailsFetcher);
+                                                page.open(result.results[currentResult].uri).then(detailsFetcher, retryCurrentResult);
                                             };
                                             retryCurrentResult = function () {
                                                 num_fails += 1;
@@ -196,17 +230,15 @@ exports.create = function (customSettings) {
                                                 setTimeout(openCurrentResult, wait_time);
                                             };
                                             detailsFetcher = function (status) {
+                                                if (status !== 'success') {
+                                                    retryCurrentResult();
+                                                    return;
+                                                }
                                                 console.log('ResultDetail: ' + (currentResult + 1) + '/' + result.results.length);
                                                 page.evaluate(resultsDetailedDataCrawler).then(function (details) {
-                                                    result.results[currentResult].ASIN = details.ASIN;
-                                                    result.results[currentResult].dateFirstAvailable = details.dateFirstAvailable;
-                                                    result.results[currentResult].numReviews = details.numReviews;
-                                                    result.results[currentResult].numAnswers = details.numAnswers;
-                                                    result.results[currentResult].numRatings5 = details.numRatings5;
-                                                    result.results[currentResult].numRatings4 = details.numRatings4;
-                                                    result.results[currentResult].numRatings3 = details.numRatings3;
-                                                    result.results[currentResult].numRatings2 = details.numRatings2;
-                                                    result.results[currentResult].numRatings1 = details.numRatings1;
+                                                    Object.keys(details).forEach(function (key) {
+                                                        result.results[currentResult][key] = details[key];
+                                                    });
                                                     currentResult += 1;
                                                     if (currentResult < result.results.length) {
                                                         page.stop();
@@ -242,3 +274,4 @@ exports.create = function (customSettings) {
     };
     return search;
 };
+/* vim: sw=4:ts=4:sts=4:expandtab:autoindent:smartindent */
