@@ -32,26 +32,38 @@ search(keywords, 'review-rank', (result) => {
     console.log("READY!");
     var outputName = (new Date(result.date)).toISOString().replace(/:/g, '-') + `.k.${result.keywords}.s.${result.sort}`;
     console.log('outputName');
+    
     fs.writeFile(`${outputName}.json`, JSON.stringify(result), (err) => {
         if (err) {
             return console.log(err);
         }
         console.log('file saved.');
-        child_process.execSync(`pdfunite page_* ${outputName}.pdf`);
-        child_process.execSync('rm page_*');
     });
+    child_process.execSync(`pdfunite page_* ${outputName}.pdf`);
+    child_process.execSync('rm page_*');
     var url = 'mongodb://localhost:27017/amazonSearch';
     MongoClient.connect(url, function(err, db) {
         var inserts = 0;
         assert.equal(null, err);
         console.log('connected to mongodb');
         var collection = db.collection(result.keywords);
-        result.results.forEach(function (r) {
+        result.results.forEach(function (r, i, a) {
+			r.resultNum = i + 1;
             collection.insert(r, function (err, res) {
                 assert.equal(null, err);
                 inserts += 1;
-                if (inserts === result.results.length) {
-                    process.exit();
+                if (inserts === a.length) {
+                    inserts = 0;
+                    collection = db.collection(result.keywords + '_pages');
+                    result.pages.forEach((p, i, a) => {
+                        collection.insert(p, (err, res) => {
+                            assert.equal(null, err);
+                            inserts += 1;
+                            if (inserts === a.length) {
+                                process.exit();
+                            }
+                        });
+                    });
                 }
             });
         });

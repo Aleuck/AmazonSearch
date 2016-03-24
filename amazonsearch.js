@@ -207,8 +207,8 @@ exports.create = function (customSettings) {
                                 // NOT YET
                                 var p = {};
                                 var storeResults = function (p_data) {
-                                    p.results = p_data.results;
                                     p.html = p_data.html;
+                                    p.qid = qid;
                                     result.results = result.results.concat(p_data.results);
                                     console.log('Pages read: ' + currentPage + '/' + pageCount);
                                     page.render('page_' + ('00' + currentPage).slice(-3) + '.pdf');
@@ -238,7 +238,8 @@ exports.create = function (customSettings) {
                                                 console.log('ResultDetail: ' + (currentResult + 1) + '/' + result.results.length);
                                                 page.evaluate(resultsDetailedDataCrawler).then(function (details) {
                                                     Object.keys(details).forEach(function (key) {
-                                                        result.results[currentResult][key] = details[key];
+                                                        var new_key = key.replace(/[-+!@#$%&()\[\]|{}*^.\s\t\n]+/g,'_');
+                                                        result.results[currentResult][new_key] = details[key];
                                                     });
                                                     result.results[currentResult].querySummary =  querySummary
                                                     currentResult += 1;
